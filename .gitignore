@@ -1,0 +1,45 @@
+# Build outputs
+build/
+lixian
+perft
+*.o
+*.a
+*.so
+
+# Third-party binaries (Stockfish is used only as an external test opponent
+# and labelling oracle; it is not part of this engine and is not redistributed)
+tools/sf/
+
+# Syzygy tablebases (~940 MB for the 3-4-5 set). Download separately.
+syzygy/
+*.rtbw
+*.rtbz
+
+# NNUE training data: regenerable with tools/nnue/datagen.cpp
+tools/nnue/data/
+tools/nnue/clouddata/
+tools/nnue/*.log
+tools/nnue/cloud.json
+
+# Training checkpoints other than the released net
+tools/nnue/weights/*.bin
+!tools/nnue/weights/nnue-final.bin
+
+# Python
+__pycache__/
+*.pyc
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Web board and training dashboard. The engine ships with its own terminal
+# play mode; these are optional local front-ends and are not part of the
+# open-source engine distribution.
+ui/
+
+# Local runtime artefacts
+weights.bin
+*.pgn

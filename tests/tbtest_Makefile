@@ -1,0 +1,110 @@
+# tbtest_Makefile -- standalone build for the Syzygy/Fathom integration test.
+#
+# This is intentionally SEPARATE from the project's top-level Makefile so that
+# adding the tablebase test cannot disturb the engine build.  It lives in
+# tests/ and builds only:
+#
+#   src/third_party/fathom/tbprobe.c   (the vendored Fathom, compiled as C)
+#   src/third_party/fathom/tb_glue.cpp (the C++ wrapper)
+#   tests/tbtest.cpp                   (the test driver)
+#
+# Usage, from the repository root:
+#     make -f tests/tbtest_Makefile          # build build/tbtest
+#     make -f tests/tbtest_Makefile run      # build and run against ./syzygy
+#     make -f tests/tbtest_Makefile run TB_PATH=/some/other/syzygy
+#     make -f tests/tbtest_Makefile debug    # assertions + ASan/UBSan build
+#     make -f tests/tbtest_Makefile clean
+#
+# Output goes to build/tbtest (the same build/ directory the top-level
+# Makefile uses, but with a distinct object suffix so nothing collides).
+
+# --- layout ----------------------------------------------------------------
+# This file is in tests/, so the repository root is one level up.
+ROOT        := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))..)
+FATHOM_DIR  := $(ROOT)/src/third_party/fathom
+BUILD_DIR   := $(ROOT)/build
+TB_PATH     ?= $(ROOT)/syzygy
+
+FATHOM_SRC  := $(FATHOM_DIR)/tbprobe.c
+GLUE_SRC    := $(FATHOM_DIR)/tb_glue.cpp
+TEST_SRC    := $(ROOT)/tests/tbtest.cpp
+
+# Distinct names: the top-level Makefile also writes into build/.
+FATHOM_OBJ  := $(BUILD_DIR)/fathom_tbprobe.o
+GLUE_OBJ    := $(BUILD_DIR)/fathom_tb_glue.o
+TEST_OBJ    := $(BUILD_DIR)/tbtest.o
+TEST_BIN    := $(BUILD_DIR)/tbtest
+
+# --- toolchain -------------------------------------------------------------
+# tbprobe.c is C11 and MUST be compiled by the C compiler: it uses
+# <stdatomic.h>, _Atomic, and C-only designated syntax.  It also #include's
+# tbchess.c textually, so tbchess.c must NOT be compiled on its own (doing so
+# fails with "unknown type name TbMove" -- it is a fragment, not a TU).
+#
+# NOTE: `CC ?= gcc` would silently be a no-op, because GNU make has a built-in
+# default CC=cc.  Use `CC = gcc` (still overridable on the command line) or the
+# built-in default of `cc` may be used instead.
+CC          = gcc
+CXX         = g++
+CSTD        = -std=c11
+CXXSTD      = -std=c++20
+
+# -pthread is required: tbprobe.c lazily maps tables under a pthread mutex
+# (active whenever TB_NO_THREADS is undefined, which is what we want so that
+# probes are thread safe after init).
+#
+# No -lm is needed; Fathom does not call libm.
+#
+# -Wno-sign-compare silences one benign warning from upstream in
+# tb_expand_mate() (int vs unsigned comparison); it is not our code.
+CFLAGS_COMMON  ?= -O2 -DNDEBUG -fPIC -Wall -Wextra -Wno-unused-parameter \
+                  -Wno-sign-compare
+CXXFLAGS_COMMON ?= -O2 -DNDEBUG -Wall -Wextra -Wno-unused-parameter
+LDFLAGS_COMMON ?= -pthread
+
+# --- rules -----------------------------------------------------------------
+.PHONY: all run debug clean
+.DEFAULT_GOAL := all
+
+all: $(TEST_BIN)
+
+$(FATHOM_OBJ): $(FATHOM_SRC) $(FATHOM_DIR)/tbchess.c $(FATHOM_DIR)/tbprobe.h \
+               $(FATHOM_DIR)/tbconfig.h $(FATHOM_DIR)/stdendian.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CSTD) $(CFLAGS_COMMON) -I$(FATHOM_DIR) -c -o $@ $<
+
+$(GLUE_OBJ): $(GLUE_SRC) $(FATHOM_DIR)/tb_glue.h $(FATHOM_DIR)/tbprobe.h
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXSTD) $(CXXFLAGS_COMMON) -I$(FATHOM_DIR) -c -o $@ $<
+
+$(TEST_OBJ): $(TEST_SRC) $(FATHOM_DIR)/tb_glue.h
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXSTD) $(CXXFLAGS_COMMON) -I$(FATHOM_DIR) -Isrc -c -o $@ $<
+
+$(TEST_BIN): $(TEST_OBJ) $(GLUE_OBJ) $(FATHOM_OBJ)
+	$(CXX) $(CXXSTD) $(CXXFLAGS_COMMON) -o $@ $^ $(LDFLAGS_COMMON)
+
+run: $(TEST_BIN)
+	./$(TEST_BIN) $(TB_PATH)
+
+# Assertions enabled (no -DNDEBUG) plus ASan/UBSan: catches the illegal-position
+# crash path and any out-of-bounds indexing in the glue's own guard.
+#
+# The flags are passed on the sub-make's command line rather than as
+# target-specific variables, because target-specific overrides are NOT
+# inherited by a recursive `$(MAKE)`.  Command-line variables are, via MAKEFLAGS.
+DEBUG_CFLAGS   = -O1 -g -fPIC -Wall -Wextra -Wno-unused-parameter \
+                 -Wno-sign-compare -fsanitize=address,undefined
+DEBUG_CXXFLAGS = -O1 -g -Wall -Wextra -Wno-unused-parameter \
+                 -fsanitize=address,undefined
+DEBUG_LDFLAGS  = -pthread -fsanitize=address,undefined
+
+debug:
+	$(MAKE) -f $(lastword $(MAKEFILE_LIST)) clean
+	$(MAKE) -f $(lastword $(MAKEFILE_LIST)) all \
+	    CFLAGS_COMMON="$(DEBUG_CFLAGS)" \
+	    CXXFLAGS_COMMON="$(DEBUG_CXXFLAGS)" \
+	    LDFLAGS_COMMON="$(DEBUG_LDFLAGS)"
+
+clean:
+	rm -f $(FATHOM_OBJ) $(GLUE_OBJ) $(TEST_OBJ) $(TEST_BIN)
