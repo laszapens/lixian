@@ -256,7 +256,7 @@ Requirements: x86-64 with AVX2 and BMI2 (built with `-march=native`). Without BM
 
 MIT. See [LICENSE](LICENSE).
 
-The vendored Fathom library is MIT (Ronald de Man, basil00, Jon Dart); see `src/third_party/fathom/LICENSE` for attribution.
+The vendored Fathom library is MIT (Ronald de Man, basil00, Jon Dart). Full attribution and licence texts are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Stockfish is **not** included. It is invoked externally by the development scripts as a sparring partner and labelling oracle. It is never linked into the engine, never a runtime dependency, and never redistributed with it.
 

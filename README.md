@@ -258,7 +258,7 @@ tools/*.py              开发期辅助脚本
 
 MIT，见 [LICENSE](LICENSE)。
 
-内置的 Fathom 是 MIT（Ronald de Man / basil00 / Jon Dart），归属见 `src/third_party/fathom/LICENSE`。
+内置的 Fathom 是 MIT（Ronald de Man / basil00 / Jon Dart）。第三方归属与许可全文见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 本仓库不包含 Stockfish。Stockfish 只作为开发期测试对手与标注工具被外部调用，从不链接进引擎、不作为运行时依赖、不随引擎分发。
 
