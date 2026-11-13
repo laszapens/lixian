@@ -90,7 +90,7 @@ uint64_t perft(Position& p, int depth) {
 }
 
 void printUci() {
-    std::cout << "id name Lixian 1.0 (离弦)\n";
+    std::cout << "id name Lixian 1.1 (离弦)" << (NNUE::available() ? " +NNUE" : "") << "\n";
     std::cout << "id author Lixian project\n";
     std::cout << "option name Hash type spin default 512 min 16 max 4096\n";
     std::cout << "option name Threads type spin default 4 min 1 max 64\n";
